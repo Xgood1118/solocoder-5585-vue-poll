@@ -12,6 +12,16 @@ export function useCountdown(deadline: Ref<number> | number) {
 
   function update() {
     const deadlineValue = typeof deadline === 'number' ? deadline : deadline.value
+
+    if (!deadlineValue || deadlineValue <= 0) {
+      days.value = 0
+      hours.value = 0
+      minutes.value = 0
+      seconds.value = 0
+      isExpired.value = false
+      return
+    }
+
     const remaining = deadlineValue - getCorrectedTime()
 
     if (remaining <= 0) {
@@ -46,6 +56,10 @@ export function useCountdown(deadline: Ref<number> | number) {
   })
 
   const formatted = computed(() => {
+    const deadlineValue = typeof deadline === 'number' ? deadline : deadline.value
+    if (!deadlineValue || deadlineValue <= 0) {
+      return '长期有效'
+    }
     const pad = (n: number) => n.toString().padStart(2, '0')
     if (days.value > 0) {
       return `${days.value}天 ${pad(hours.value)}:${pad(minutes.value)}:${pad(seconds.value)}`

@@ -6,8 +6,8 @@ export const lastWsMessage = ref<WSMessage | null>(null)
 export const lastServerTime = ref<number | null>(null)
 
 const WS_URLS = [
-  typeof window !== 'undefined' ? `ws://${window.location.hostname}:5177/ws` : 'ws://localhost:5177/ws',
-  'ws://localhost:5177/ws',
+  typeof window !== 'undefined' ? `ws://${window.location.hostname}:8136/ws` : 'ws://localhost:8136/ws',
+  'ws://localhost:8136/ws',
 ]
 
 let ws: WebSocket | null = null
@@ -62,8 +62,8 @@ export function connect(pollId: string) {
     reconnectAttempts = 0
     if (!ws) return
     try {
-      ws.send(JSON.stringify({ type: 'subscribe', pollId }))
-      ws.send(JSON.stringify({ type: 'time_sync', clientBefore: Date.now() }))
+      ws.send(JSON.stringify({ type: 'subscribe', payload: { pollId } }))
+      ws.send(JSON.stringify({ type: 'time_sync', payload: { clientBefore: Date.now() } }))
     } catch {
       /* ignore */
     }
@@ -152,7 +152,7 @@ export function send(msg: WSMessage): boolean {
 export function requestTimeSync() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return
   try {
-    ws.send(JSON.stringify({ type: 'time_sync', clientBefore: Date.now() }))
+    ws.send(JSON.stringify({ type: 'time_sync', payload: { clientBefore: Date.now() } }))
   } catch {
     /* ignore */
   }

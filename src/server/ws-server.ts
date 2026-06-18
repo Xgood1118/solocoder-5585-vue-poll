@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import http from 'node:http'
 
-const PORT = Number(process.env.WS_PORT || 5177)
+const PORT = Number(process.env.WS_PORT || 8136)
 const POLLS_KEY = 'vue-poll-polls'
 const VOTES_KEY = 'vue-poll-votes'
 
@@ -21,23 +21,43 @@ function send(ws: Client, payload: unknown) {
   }
 }
 
+function corsHeaders(req: http.IncomingMessage, res: http.ServerResponse, next: () => void) {
+  const origin = req.headers.origin || '*'
+  const acHeaders = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Max-Age': '86400',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, acHeaders)
+    res.end()
+    return
+  }
+  for (const [k, v] of Object.entries(acHeaders)) {
+    res.setHeader(k, v)
+  }
+  res.setHeader('Vary', 'Origin')
+  next()
+}
+
 const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ok: true, time: Date.now(), iso: nowISO() }))
-    return
-  }
-  if (req.url === '/time') {
-    res.writeHead(200, {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    })
-    const t = Date.now()
-    res.end(JSON.stringify({ unixtime: Math.floor(t / 1000), serverTime: t, iso: nowISO() }))
-    return
-  }
-  res.writeHead(404)
-  res.end('Not Found')
+  corsHeaders(req, res, () => {
+    if (req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ ok: true, time: Date.now(), iso: nowISO() }))
+      return
+    }
+    if (req.url === '/time') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      const t = Date.now()
+      res.end(JSON.stringify({ unixtime: Math.floor(t / 1000), serverTime: t, iso: nowISO() }))
+      return
+    }
+    res.writeHead(404)
+    res.end('Not Found')
+  })
 })
 
 const wss = new WebSocketServer({ server, path: '/ws' })

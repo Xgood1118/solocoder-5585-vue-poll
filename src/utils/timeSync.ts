@@ -52,8 +52,8 @@ if (typeof window !== 'undefined') {
 }
 
 const TIME_ENDPOINTS: Array<{ url: string; kind: 'worldtime' | 'timeapi' | 'local' }> = [
-  { url: typeof window !== 'undefined' ? `http://${window.location.hostname}:5177/time` : 'http://localhost:5177/time', kind: 'local' },
-  { url: 'http://localhost:5177/time', kind: 'local' },
+  { url: typeof window !== 'undefined' ? `http://${window.location.hostname}:8136/time` : 'http://localhost:8136/time', kind: 'local' },
+  { url: 'http://localhost:8136/time', kind: 'local' },
   { url: 'https://timeapi.io/api/Time/current/zone?timeZone=UTC', kind: 'timeapi' },
   { url: 'https://worldtimeapi.org/api/timezone/Etc/UTC', kind: 'worldtime' },
 ]

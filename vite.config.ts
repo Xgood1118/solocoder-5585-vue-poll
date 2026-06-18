@@ -6,7 +6,7 @@ import traeBadgePlugin from 'vite-plugin-trae-solo-badge'
 
 export default defineConfig({
   server: {
-    port: 5176,
+    port: 8135,
     strictPort: true,
   },
   build: {
