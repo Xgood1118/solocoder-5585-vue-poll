@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, provide } from 'vue'
+import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { RouterView } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { usePollStore } from '@/stores/pollStore'
+import { syncTime, getCorrectedTime } from '@/utils/timeSync'
 
 const pollStore = usePollStore()
 
 const isDark = ref(false)
+let deadlineTimer: ReturnType<typeof setInterval> | null = null
+let syncTimer: ReturnType<typeof setInterval> | null = null
 
 function initTheme() {
   const stored = localStorage.getItem('vue-poll-theme')
@@ -28,9 +31,27 @@ function toggleTheme() {
 
 provide('toggleTheme', toggleTheme)
 
-onMounted(() => {
+onMounted(async () => {
   initTheme()
+  try {
+    await syncTime()
+  } catch (e) {
+    console.warn('[timeSync] 首次同步失败，回退到本地时间', e)
+  }
   pollStore.checkDeadlines()
+
+  deadlineTimer = setInterval(() => {
+    pollStore.checkDeadlines()
+  }, 15_000)
+
+  syncTimer = setInterval(async () => {
+    try { await syncTime() } catch { /* ignore */ }
+  }, 5 * 60_000)
+})
+
+onUnmounted(() => {
+  if (deadlineTimer) clearInterval(deadlineTimer)
+  if (syncTimer) clearInterval(syncTimer)
 })
 </script>
 

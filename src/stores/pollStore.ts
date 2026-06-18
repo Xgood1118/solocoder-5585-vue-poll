@@ -1,12 +1,26 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import type { Poll, PollStatus } from '@/types'
+import type { Poll, PollStatus, WSMessage } from '@/types'
 import { generateId } from '@/utils/id'
+import { broadcast, subscribeToPollSync } from '@/composables/useRealtimeSync'
+import { getCorrectedTime } from '@/utils/timeSync'
 
 const STORAGE_KEY = 'vue-poll-polls'
 
 function savePolls(polls: Poll[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(polls))
+}
+
+function broadcastPollChange(operation: 'create' | 'update' | 'delete' | 'duplicate' | 'archive' | 'unarchive' | 'seal' = 'update', pollId?: string) {
+  const msg: WSMessage = {
+    type: 'poll_updated',
+    payload: {
+      operation,
+      pollId,
+      timestamp: Date.now(),
+    },
+  }
+  broadcast(msg)
 }
 
 export const usePollStore = defineStore('poll', () => {
@@ -64,6 +78,7 @@ export const usePollStore = defineStore('poll', () => {
     }
     polls.value.push(poll)
     savePolls(polls.value)
+    broadcastPollChange('create', poll.id)
     return poll
   }
 
@@ -72,19 +87,22 @@ export const usePollStore = defineStore('poll', () => {
     if (index === -1) return
     polls.value[index] = { ...polls.value[index], ...data, updatedAt: Date.now() }
     savePolls(polls.value)
+    broadcastPollChange('update', id)
   }
 
   function deletePoll(id: string): void {
     polls.value = polls.value.filter(p => p.id !== id)
     savePolls(polls.value)
+    broadcastPollChange('delete', id)
   }
 
   function duplicatePoll(id: string): Poll | undefined {
     const source = polls.value.find(p => p.id === id)
     if (!source) return undefined
     const now = Date.now()
+    const rawSource: Poll = JSON.parse(JSON.stringify(source))
     const clone: Poll = {
-      ...structuredClone(source),
+      ...rawSource,
       id: generateId(),
       title: source.title + '(副本)',
       createdAt: now,
@@ -92,10 +110,16 @@ export const usePollStore = defineStore('poll', () => {
       status: 'draft',
       isArchived: false,
       isSealed: false,
+      password: undefined,
     }
-    clone.options = clone.options.map(o => ({ ...o, id: generateId(), pollId: clone.id }))
+    clone.options = rawSource.options.map(o => ({
+      ...o,
+      id: generateId(),
+      pollId: clone.id,
+    }))
     polls.value.push(clone)
     savePolls(polls.value)
+    broadcastPollChange()
     return clone
   }
 
@@ -105,6 +129,7 @@ export const usePollStore = defineStore('poll', () => {
     poll.isArchived = true
     poll.updatedAt = Date.now()
     savePolls(polls.value)
+    broadcastPollChange('archive', id)
   }
 
   function unarchivePoll(id: string): void {
@@ -113,6 +138,7 @@ export const usePollStore = defineStore('poll', () => {
     poll.isArchived = false
     poll.updatedAt = Date.now()
     savePolls(polls.value)
+    broadcastPollChange('unarchive', id)
   }
 
   function sealPoll(id: string): void {
@@ -122,12 +148,13 @@ export const usePollStore = defineStore('poll', () => {
     poll.status = 'closed' as PollStatus
     poll.updatedAt = Date.now()
     savePolls(polls.value)
+    broadcastPollChange('seal', id)
   }
 
   function checkDeadlines(): void {
-    const now = Date.now()
+    const now = getCorrectedTime()
     for (const poll of polls.value) {
-      if (poll.status === 'active' && poll.deadline && poll.deadline < now) {
+      if (poll.status === 'active' && !poll.isSealed && poll.deadline && poll.deadline < now) {
         sealPoll(poll.id)
       }
     }
@@ -149,6 +176,14 @@ export const usePollStore = defineStore('poll', () => {
   }
 
   loadFromStorage()
+
+  if (typeof window !== 'undefined') {
+    subscribeToPollSync((msg) => {
+      if (msg.type === 'poll_updated') {
+        loadFromStorage()
+      }
+    })
+  }
 
   return {
     polls,

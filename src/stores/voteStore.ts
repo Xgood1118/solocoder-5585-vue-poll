@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { VoteRecord, TimelinePoint } from '@/types'
+import type { VoteRecord, TimelinePoint, WSMessage } from '@/types'
+import { broadcast, subscribeToPollSync } from '@/composables/useRealtimeSync'
 
 const STORAGE_KEY = 'vue-poll-votes'
 
@@ -82,6 +83,16 @@ export const useVoteStore = defineStore('vote', () => {
       }
     }
     saveToStorage()
+    const msg: WSMessage = {
+      type: 'vote_submitted',
+      payload: {
+        pollId: record.pollId,
+        voteId: record.id,
+        counts: getVoteCountsByPoll(record.pollId),
+        timestamp: record.votedAt,
+      },
+    }
+    broadcast(msg)
   }
 
   function checkAntiFraud(pollId: string, fingerprint: string): { allowed: boolean; reason?: string } {
@@ -121,6 +132,14 @@ export const useVoteStore = defineStore('vote', () => {
   }
 
   loadFromStorage()
+
+  if (typeof window !== 'undefined') {
+    subscribeToPollSync((msg) => {
+      if (msg.type === 'vote_submitted') {
+        loadFromStorage()
+      }
+    })
+  }
 
   return {
     votes,

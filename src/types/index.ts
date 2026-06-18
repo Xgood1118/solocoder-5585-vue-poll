@@ -63,13 +63,16 @@ export interface TimelinePoint {
 }
 
 export interface WSMessage {
-  type: 'vote_update' | 'poll_closed' | 'connection_established'
+  type: 'vote_update' | 'poll_closed' | 'connection_established' | 'vote_submitted' | 'poll_updated'
   payload: {
     pollId: string
     optionId?: string
     voterFingerprint?: string
     timestamp: number
     voteCounts?: Record<string, number>
+    voteId?: string
+    operation?: 'create' | 'update' | 'delete' | 'duplicate' | 'archive' | 'unarchive' | 'seal'
+    counts?: Record<string, number>
   }
 }
 

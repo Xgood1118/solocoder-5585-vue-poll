@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { usePollStore } from '@/stores/pollStore'
 import { useVoteStore } from '@/stores/voteStore'
 import { useCountdown } from '@/composables/useCountdown'
 import { useAntiFraud } from '@/composables/useAntiFraud'
+import { heartbeat, subscribeToPollSync } from '@/composables/useRealtimeSync'
 import { generateId } from '@/utils/id'
 import type { PollOption, VoteSelection, VoteRecord } from '@/types'
+import { getCorrectedTime } from '@/utils/timeSync'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,7 +28,7 @@ if (poll?.password) {
 
 const deadline = computed(() => poll?.deadline ?? 0)
 const { days, hours, minutes, seconds, isExpired, formatted } = useCountdown(deadline)
-const { checkVote, fingerprint } = useAntiFraud()
+const antiFraud = useAntiFraud()
 
 const selectedOptionId = ref<string | null>(null)
 const selectedOptionIds = ref<string[]>([])
@@ -36,6 +38,27 @@ const ratings = ref<Record<string, number>>({})
 const showConfirm = ref(false)
 const submitMessage = ref('')
 const isSubmitting = ref(false)
+const riskInfo = ref<{ score: number; reasons: string[] } | null>(null)
+const livePulse = ref(false)
+
+watch(isExpired, (v) => {
+  if (v && poll && poll.status !== 'closed') {
+    pollStore.checkDeadlines()
+  }
+})
+
+if (typeof window !== 'undefined') {
+  subscribeToPollSync((msg) => {
+    if (msg.type === 'vote_submitted' && msg.payload?.pollId === pollId) {
+      livePulse.value = true
+      setTimeout(() => { livePulse.value = false }, 1500)
+    }
+    if (msg.type === 'poll_updated' && msg.payload?.pollId === pollId) {
+      pollStore.loadFromStorage()
+    }
+  })
+  setTimeout(() => heartbeat(pollId), 300)
+}
 
 const maxSelections = computed(() => poll?.settings?.maxSelections ?? 1)
 
@@ -55,7 +78,8 @@ const hasSelection = computed(() => {
   }
 })
 
-const canSubmit = computed(() => hasSelection.value && !isExpired.value && !isSubmitting.value)
+const canSubmit = computed(() => hasSelection.value && !isExpired.value && !isSubmitting.value &&
+  !poll?.isSealed && poll?.status !== 'closed')
 
 const isSealedOrClosed = computed(() => poll?.isSealed || poll?.status === 'closed')
 
@@ -118,13 +142,18 @@ function buildSelections(): VoteSelection[] {
 async function submitVote() {
   if (!poll) return
 
-  if (voteStore.hasVoted(pollId, fingerprint.value)) {
+  const fp = antiFraud.getFingerprint()
+  if (voteStore.hasVoted(pollId, fp.combined)) {
     submitMessage.value = '您已经投过票了'
     showConfirm.value = false
     return
   }
 
-  const fraudCheck = checkVote(pollId)
+  const allVotes = voteStore.getVotesByPollId(pollId)
+  const fraudCheck = antiFraud.evaluate(pollId, allVotes)
+
+  riskInfo.value = { score: fraudCheck.riskScore, reasons: fraudCheck.riskReasons }
+
   if (!fraudCheck.allowed) {
     submitMessage.value = fraudCheck.reason ?? '投票被拒绝'
     showConfirm.value = false
@@ -138,15 +167,18 @@ async function submitVote() {
     id: generateId(),
     pollId,
     selections,
-    voterFingerprint: fingerprint.value,
-    votedAt: Date.now(),
+    voterFingerprint: fp.combined,
+    votedAt: getCorrectedTime(),
   }
 
+  antiFraud.recordVote(pollId)
   voteStore.addVote(record)
   isSubmitting.value = false
   showConfirm.value = false
   submitMessage.value = '投票成功！'
-  router.push(`/result/${pollId}`)
+  setTimeout(() => {
+    router.push(`/result/${pollId}`)
+  }, 600)
 }
 
 function confirmSubmit() {

@@ -1,36 +1,112 @@
-import type { Poll } from '@/types'
-import { generateId } from '@/utils/id'
+import { ref, watch, onBeforeUnmount } from 'vue'
+import type { Poll, PollType } from '@/types'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 
-interface DraftPoll extends Partial<Poll> {
-  id: string
+export interface DraftSnapshot {
+  mode: 'create' | 'edit'
+  pollId?: string
+  title: string
+  description: string
+  type: PollType
+  deadline: string
+  passwordEnabled: boolean
+  password: string
+  options: Array<{ id: string; label: string; imageUrl: string; backgroundColor: string; displayOrder: number }>
+  settings: {
+    ratingMin: number
+    ratingMax: number
+    ratingStep: number
+    maxSelections: number
+  }
   savedAt: number
 }
 
+const KEY = 'vue-poll-autosave-draft'
+
 export function useDrafts() {
-  const drafts = useLocalStorage<DraftPoll[]>('vue-poll-drafts', [])
+  const draft = useLocalStorage<DraftSnapshot | null>(KEY, null)
+  const lastSavedAt = ref<number | null>(draft.value?.savedAt ?? null)
+  const showRestoreBanner = ref(false)
 
-  function saveDraft(poll: Partial<Poll>) {
-    const draft: DraftPoll = {
-      ...poll,
-      id: poll.id || generateId(),
-      savedAt: Date.now()
+  function save(snapshot: DraftSnapshot) {
+    const payload: DraftSnapshot = { ...snapshot, savedAt: Date.now() }
+    draft.value = payload
+    lastSavedAt.value = payload.savedAt
+  }
+
+  function restore(): DraftSnapshot | null {
+    const snapshot = draft.value
+    if (!snapshot) return null
+    showRestoreBanner.value = false
+    return { ...snapshot }
+  }
+
+  function clear() {
+    draft.value = null
+    lastSavedAt.value = null
+    showRestoreBanner.value = false
+  }
+
+  function hasDraft(): boolean {
+    return !!draft.value
+  }
+
+  function promptRestoreIfAny(mode: 'create' | 'edit', pollId?: string): boolean {
+    if (!draft.value) {
+      showRestoreBanner.value = false
+      return false
     }
-    drafts.value.push(draft)
+    const modeMatch = draft.value.mode === mode
+    const idMatch = mode === 'edit'
+      ? (draft.value.pollId === pollId)
+      : true
+    if (modeMatch && idMatch) {
+      showRestoreBanner.value = true
+      return true
+    }
+    return false
   }
 
-  function removeDraft(id: string) {
-    drafts.value = drafts.value.filter(d => d.id !== id)
-  }
+  function bindAutoSave<T extends object>(
+    collectFn: () => DraftSnapshot,
+    debounceMs: number = 800,
+  ) {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let latestRevision = 0
 
-  function restoreDraft(id: string): Partial<Poll> | undefined {
-    return drafts.value.find(d => d.id === id)
+    const schedule = () => {
+      const revision = ++latestRevision
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (revision !== latestRevision) return
+        try {
+          const snapshot = collectFn()
+          const hasContent =
+            snapshot.title.trim().length > 0 ||
+            snapshot.description.trim().length > 0 ||
+            snapshot.options.some(o => o.label.trim().length > 0) ||
+            snapshot.options.length > 2
+          if (hasContent) save(snapshot)
+        } catch { /* ignore collect errors */ }
+      }, debounceMs)
+    }
+
+    onBeforeUnmount(() => {
+      if (timer) clearTimeout(timer)
+    })
+
+    return { schedule }
   }
 
   return {
-    drafts,
-    saveDraft,
-    removeDraft,
-    restoreDraft
+    draft,
+    lastSavedAt,
+    showRestoreBanner,
+    save,
+    restore,
+    clear,
+    hasDraft,
+    promptRestoreIfAny,
+    bindAutoSave,
   }
 }

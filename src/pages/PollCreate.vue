@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import draggable from 'vuedraggable'
 import { usePollStore } from '@/stores/pollStore'
 import { generateId } from '@/utils/id'
 import type { PollType } from '@/types'
+import { useDrafts, type DraftSnapshot } from '@/composables/useDrafts'
 
 const router = useRouter()
 const pollStore = usePollStore()
+const drafts = useDrafts()
 
 const title = ref('')
 const description = ref('')
@@ -23,6 +25,40 @@ const settings = reactive({
   ratingStep: 1,
   maxSelections: 1,
 })
+
+function collectSnapshot(): DraftSnapshot {
+  return {
+    mode: 'create',
+    title: title.value,
+    description: description.value,
+    type: type.value,
+    deadline: deadline.value,
+    passwordEnabled: passwordEnabled.value,
+    password: password.value,
+    options: JSON.parse(JSON.stringify(Array.from(options))),
+    settings: {
+      ratingMin: settings.ratingMin,
+      ratingMax: settings.ratingMax,
+      ratingStep: settings.ratingStep,
+      maxSelections: settings.maxSelections,
+    },
+    savedAt: 0,
+  }
+}
+
+const autosave = drafts.bindAutoSave(collectSnapshot, 700)
+
+watch([title, description, type, deadline, passwordEnabled, password], () => {
+  autosave.schedule()
+}, { deep: true })
+
+watch(options, () => {
+  autosave.schedule()
+}, { deep: true })
+
+watch(settings, () => {
+  autosave.schedule()
+}, { deep: true })
 
 function addOption() {
   options.push({
@@ -76,24 +112,74 @@ function buildPollData(status: 'active' | 'draft') {
   }
 }
 
+function applySnapshot(snapshot: DraftSnapshot) {
+  title.value = snapshot.title
+  description.value = snapshot.description
+  type.value = snapshot.type
+  deadline.value = snapshot.deadline
+  passwordEnabled.value = snapshot.passwordEnabled
+  password.value = snapshot.password
+  options.splice(0, options.length, ...snapshot.options)
+  settings.ratingMin = snapshot.settings.ratingMin
+  settings.ratingMax = snapshot.settings.ratingMax
+  settings.ratingStep = snapshot.settings.ratingStep
+  settings.maxSelections = snapshot.settings.maxSelections
+}
+
+function restoreDraft() {
+  const snapshot = drafts.restore()
+  if (snapshot) applySnapshot(snapshot)
+}
+
+function discardDraft() {
+  drafts.clear()
+}
+
 function submitPoll() {
   if (!title.value.trim()) return
   if (options.length < 2) return
   pollStore.createPoll(buildPollData('active'))
+  drafts.clear()
   router.push('/')
 }
 
 function saveDraft() {
   pollStore.createPoll(buildPollData('draft'))
+  drafts.clear()
   router.push('/')
 }
 
-addOption()
-addOption()
+onMounted(() => {
+  const hasDraft = drafts.promptRestoreIfAny('create')
+  if (!hasDraft) {
+    if (options.length === 0) {
+      addOption()
+      addOption()
+    }
+  }
+})
 </script>
 
 <template>
   <div class="create-form">
+    <div v-if="drafts.showRestoreBanner.value" class="draft-banner">
+      <span class="draft-banner__icon"><Icon icon="mdi:file-restore-outline" /></span>
+      <div class="draft-banner__text">
+        <strong>检测到未完成的草稿</strong>
+        <small v-if="drafts.draft.value?.savedAt">保存于 {{ new Date(drafts.draft.value.savedAt).toLocaleString('zh-CN') }}</small>
+      </div>
+      <div class="draft-banner__actions">
+        <button class="btn-restore" @click="restoreDraft">
+          <Icon icon="mdi:history" />
+          恢复内容
+        </button>
+        <button class="btn-discard" @click="discardDraft">
+          <Icon icon="mdi:close" />
+          放弃
+        </button>
+      </div>
+    </div>
+
     <h1 class="create-form__title">创建投票</h1>
 
     <section class="form-section">
@@ -216,6 +302,71 @@ addOption()
   max-width: 720px;
   margin: 0 auto;
   padding: $spacing-lg;
+}
+
+.draft-banner {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  margin-bottom: $spacing-lg;
+  background: color.adjust($color-warning, $lightness: 45%, $alpha: -0.85);
+  border: 1px solid color.adjust($color-warning, $lightness: 30%);
+  border-left: 4px solid $color-warning;
+  border-radius: $radius-lg;
+
+  &__icon {
+    font-size: 22px;
+    color: $color-warning;
+    flex-shrink: 0;
+  }
+
+  &__text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    strong {
+      font-size: $font-size-sm;
+      color: $color-text;
+    }
+
+    small {
+      font-size: $font-size-xs;
+      color: $color-text-light;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+  }
+}
+
+.btn-restore {
+  @include button-base;
+  background: $color-primary;
+  color: #fff;
+  font-size: $font-size-sm;
+  padding: $spacing-xs $spacing-md;
+  gap: 4px;
+
+  &:hover { opacity: 0.85; }
+}
+
+.btn-discard {
+  @include button-base;
+  background: transparent;
+  color: $color-text-light;
+  font-size: $font-size-sm;
+  padding: $spacing-xs $spacing-md;
+  gap: 4px;
+
+  &:hover {
+    background: rgba($color-danger, 0.1);
+    color: $color-danger;
+  }
 }
 
 .create-form__title {
