@@ -1,0 +1,5 @@
+1. 截止倒计时直接显示"已截止"了,新发起的投票一进详情页就 expired,业务方配截止时间完全失效。查了 localStorage 里 timeOffset 是 8.9e11(差不多 28 年),getCorrectedTime 拿这个加 now,所有未到点的投票都被判过期,等于把"防提前关"反向搞成"秒关"。
+
+2. 校时链国内端点全挂。timeapi.io 的 milliSeconds 字段返回的是当前秒的毫秒部分(比如 138),根本不是 unix 毫秒时间戳,被当成 serverTime 减去 clientMid 直接差出 1.78e12;worldtimeapi 国内也通不了,fallback 一路错到缓存,下次进任何页都带这个错值。
+
+3. 本地 ws-server 那个 /time 端点 curl 测是通的,拿得到正确 serverTime,但前端 fetchEndpoint 链把它排在 worldtimeapi 后面,通通没机会跑到。检查修复一下。
