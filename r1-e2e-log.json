@@ -1,0 +1,22 @@
+[
+  "[TEST1-home] 投票系统\n投票管理\n新建投票\n全部\n进行中\n草稿\n已结束\n已归档\n\n暂无投票",
+  "[TEST2-options] 初始选项数: 2",
+  "[TEST2-result] 首页投票卡片数: 1",
+  "[TEST3-votePage] 投票系统\n测试单选投票\n\nR1 评估测试\n\n已截止\n投票已截止，无法继续投票\n选项A\n选项B\n提交投票",
+  "[TEST3-optionCards] 选项卡片数: 2",
+  "[TEST3-resultPage] 投票系统\n测试单选投票\n\nR1 评估测试\n\n已截止\n投票已截止，无法继续投票\n选项A\n选项B\n提交投票",
+  "[TEST4-canvas] canvas 元素数: 0",
+  "[TEST5-shareModal] NO MODAL",
+  "[TEST6-beforeWS] \"NO_WINDOW_VAR\"",
+  "[TEST7-editPage] 投票系统\n编辑投票\n基础信息\n标题\n描述\n类型\n单选\n多选\n排序\n评分\n选项编辑\n添加选项\n截止设置\n截止时间\n口令保护\n启用口令\n保存草稿\n发布投票",
+  "[PAGEERROR] DataCloneError: Failed to execute 'structuredClone' on 'Window': #<Object> could not be cloned.",
+  "[TEST8-copy] 复制前: 1, 复制后: 1",
+  "[TEST9-archive] 归档数: 1",
+  "[TEST10-ranking] 上移按钮存在: true",
+  "[TEST11-stars] 星数: 10",
+  "[TEST12-timeSync] {\"hasTimeOffset\":false}",
+  "[TEST13-draft] 草稿数: 1",
+  "[TEST14-delete] 删除前: 4, 删除后: 3",
+  "[TEST15-storage] localStorage keys: vue-poll-polls, votes: null",
+  "[TEST16-voterList] 投票人\n时间\n讲师甲\n讲师乙\n暂无投票记录"
+]

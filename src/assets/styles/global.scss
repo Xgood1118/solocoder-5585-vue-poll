@@ -1,0 +1,168 @@
+@use "./mixins" as *;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: $font-size-base;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: $font-display;
+  background: $color-bg;
+  color: $color-text;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.dark body {
+  background: $color-dark-bg;
+  color: $color-dark-text;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $color-border;
+  border-radius: $radius-sm;
+
+  &:hover {
+    background: $color-text-light;
+  }
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: $color-dark-card;
+
+  &:hover {
+    background: $color-dark-text;
+  }
+}
+
+.container {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: $spacing-md;
+}
+
+.card {
+  @include card-base;
+  @include hover-lift;
+}
+
+.btn-primary {
+  @include button-base;
+  background: $color-primary;
+  color: #fff;
+
+  &:hover {
+    background: lighten($color-primary, 8%);
+  }
+}
+
+.btn-secondary {
+  @include button-base;
+  background: transparent;
+  color: $color-primary;
+  border: 1px solid $color-border;
+
+  &:hover {
+    background: $color-bg;
+  }
+}
+
+.btn-danger {
+  @include button-base;
+  background: $color-danger;
+  color: #fff;
+
+  &:hover {
+    background: color.adjust($color-danger, $lightness: 8%);
+  }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $radius-xl;
+  font-size: $font-size-xs;
+  font-weight: 600;
+  line-height: 1;
+  background: rgba($color-primary, 0.1);
+  color: $color-primary;
+
+  &--accent {
+    background: rgba($color-accent, 0.1);
+    color: $color-accent;
+  }
+
+  &--success {
+    background: rgba($color-success, 0.1);
+    color: $color-success;
+  }
+
+  &--danger {
+    background: rgba($color-danger, 0.1);
+    color: $color-danger;
+  }
+
+  &--warning {
+    background: rgba($color-warning, 0.1);
+    color: $color-warning;
+  }
+}
+
+.form-input {
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  font-family: $font-display;
+  font-size: $font-size-sm;
+  color: $color-text;
+  background: $color-card;
+  transition: border-color $transition-fast;
+
+  &:focus {
+    outline: none;
+    border-color: $color-primary;
+    box-shadow: 0 0 0 3px rgba($color-primary, 0.1);
+  }
+
+  &::placeholder {
+    color: $color-text-light;
+  }
+
+  @include dark-mode {
+    border-color: $color-dark-card;
+    background: $color-dark-card;
+    color: $color-dark-text;
+  }
+}
+
+.form-label {
+  display: block;
+  margin-bottom: $spacing-xs;
+  font-size: $font-size-sm;
+  font-weight: 500;
+  color: $color-text;
+
+  @include dark-mode {
+    color: $color-dark-text;
+  }
+}

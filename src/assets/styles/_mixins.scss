@@ -1,0 +1,62 @@
+@use "./variables" as *;
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin card-base {
+  background: $color-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+  padding: $spacing-lg;
+}
+
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin respond-to($bp) {
+  @media (max-width: $bp) {
+    @content;
+  }
+}
+
+@mixin dark-mode {
+  .dark & {
+    @content;
+  }
+}
+
+@mixin hover-lift {
+  transition: transform $transition-base, box-shadow $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-md;
+  }
+}
+
+@mixin button-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+  cursor: pointer;
+  transition: all $transition-fast;
+  border: none;
+  font-family: $font-display;
+  font-size: $font-size-sm;
+  font-weight: 500;
+  line-height: 1.5;
+}
