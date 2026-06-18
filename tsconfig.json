@@ -18,5 +18,8 @@
     "src/**/*.ts",
     "src/**/*.vue",
     "api"
+  ],
+  "exclude": [
+    "src/server/**"
   ]
 }

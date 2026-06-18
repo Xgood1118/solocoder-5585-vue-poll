@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { usePollStore } from '@/stores/pollStore'
 import { useVoteStore } from '@/stores/voteStore'
 import { useCountdown } from '@/composables/useCountdown'
-import { useWebSocket } from '@/composables/useWebSocket'
+import { subscribeToPollSync } from '@/composables/useRealtimeSync'
 import { exportAsJson, exportAsIcs } from '@/utils/export'
 import BarChart from '@/components/chart/BarChart.vue'
 import PieChart from '@/components/chart/PieChart.vue'
@@ -23,14 +23,15 @@ const poll = computed(() => pollStore.getPollById(pollId))
 const deadline = computed(() => poll.value?.deadline ?? 0)
 const { days, hours, minutes, seconds, isExpired, formatted } = useCountdown(deadline)
 
-const { connect, disconnect, isConnected, lastMessage, simulateVoteUpdate } = useWebSocket()
-
 onMounted(() => {
-  connect(pollId)
-})
-
-onUnmounted(() => {
-  disconnect()
+  subscribeToPollSync((msg) => {
+    if (msg.type === 'vote_submitted' && msg.payload?.pollId === pollId) {
+      voteStore.loadFromStorage()
+    }
+    if (msg.type === 'poll_updated' && msg.payload?.pollId === pollId) {
+      pollStore.loadFromStorage()
+    }
+  })
 })
 
 const activeView = ref<'bar' | 'pie' | 'timeline' | 'voter'>('bar')
@@ -171,12 +172,6 @@ function exportIcs() {
   exportAsIcs(poll.value)
 }
 
-watch(lastMessage, (msg) => {
-  if (msg && msg.type === 'vote_update' && msg.payload.pollId === pollId) {
-    voteStore.loadFromStorage()
-  }
-})
-
 const pollTypeLabel: Record<PollType, string> = {
   single: '单选',
   multiple: '多选',
@@ -223,10 +218,6 @@ const totalVotes = computed(() => votes.value.length)
       <button class="action-bar__btn" @click="exportIcs">
         <Icon icon="mdi:calendar" />
         <span>导出ICS</span>
-      </button>
-      <button class="action-bar__btn" @click="simulateVoteUpdate(pollId, poll.options[0]?.id ?? '')">
-        <Icon icon="mdi:vote" />
-        <span>模拟投票</span>
       </button>
     </div>
 

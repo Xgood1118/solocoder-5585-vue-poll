@@ -8,9 +8,37 @@ let broadcastChannel: BroadcastChannel | null = null
 const listeners = new Set<(msg: WSMessage) => void>()
 const storageHandlerRegistered = ref(false)
 const connectedClients = new Set<string>()
+const wsReady = { subscribed: false }
 const clientId = (typeof crypto !== 'undefined' && crypto.randomUUID)
   ? crypto.randomUUID()
   : 'client-' + Math.random().toString(36).slice(2, 10)
+
+function ensureWsSubscribed() {
+  if (wsReady.subscribed) return
+  wsReady.subscribed = true
+  import('@/composables/useWebSocket')
+    .then((mod) => {
+      mod.subscribe((msg) => {
+        if (!msg || !msg.type) return
+        if (msg.type === 'vote_submitted' || msg.type === 'poll_updated') {
+          for (const l of listeners) {
+            try { l(msg) } catch { /* ignore */ }
+          }
+        }
+      })
+    })
+    .catch(() => {
+      wsReady.subscribed = false
+    })
+}
+
+function wsSendLazy(msg: WSMessage) {
+  import('@/composables/useWebSocket')
+    .then((mod) => {
+      try { mod.send(msg) } catch { /* ignore ws not connected */ }
+    })
+    .catch(() => { /* ignore */ })
+}
 
 function getChannel(): BroadcastChannel | null {
   if (typeof BroadcastChannel === 'undefined') return null
@@ -21,7 +49,7 @@ function getChannel(): BroadcastChannel | null {
         const msg = ev.data as WSMessage & { __sender?: string }
         if (msg.__sender === clientId) return
         for (const l of listeners) {
-          try { l(msg) } catch (e) { /* ignore */ }
+          try { l(msg) } catch { /* ignore */ }
         }
       }
     } catch {
@@ -43,7 +71,7 @@ function ensureStorageHandler() {
       if (msg.__ts && msg.__ts <= lastSeen) return
       if (msg.__ts) sessionStorage.setItem(STORAGE_EVENT_KEY + '_last', String(msg.__ts))
       for (const l of listeners) {
-        try { l(msg) } catch (e) { /* ignore */ }
+        try { l(msg) } catch { /* ignore */ }
       }
     } catch { /* ignore parse errors */ }
   })
@@ -66,12 +94,16 @@ export function broadcast(msg: WSMessage) {
     } catch { /* ignore quota errors */ }
   }
 
+  wsSendLazy(msg)
+  ensureWsSubscribed()
+
   connectedClients.add(clientId)
 }
 
 export function subscribeToPollSync(callback: (msg: WSMessage) => void): () => void {
   getChannel()
   ensureStorageHandler()
+  ensureWsSubscribed()
   listeners.add(callback)
   return () => { listeners.delete(callback) }
 }

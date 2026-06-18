@@ -3,9 +3,13 @@ import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { RouterView } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { usePollStore } from '@/stores/pollStore'
+import { useVoteStore } from '@/stores/voteStore'
 import { syncTime, getCorrectedTime } from '@/utils/timeSync'
+import { useWebSocket } from '@/composables/useWebSocket'
 
 const pollStore = usePollStore()
+const voteStore = useVoteStore()
+const { connect: wsConnect, disconnect: wsDisconnect, subscribe: wsSubscribe } = useWebSocket()
 
 const isDark = ref(false)
 let deadlineTimer: ReturnType<typeof setInterval> | null = null
@@ -33,6 +37,21 @@ provide('toggleTheme', toggleTheme)
 
 onMounted(async () => {
   initTheme()
+
+  try {
+    wsConnect('__global__')
+  } catch (e) { /* ignore */ }
+
+  wsSubscribe((msg) => {
+    if (!msg || !msg.type) return
+    if (msg.type === 'vote_submitted') {
+      try { voteStore.loadFromStorage() } catch (e) { /* ignore */ }
+    }
+    if (msg.type === 'poll_updated') {
+      try { pollStore.loadFromStorage() } catch (e) { /* ignore */ }
+    }
+  })
+
   try {
     await syncTime()
   } catch (e) {
@@ -45,13 +64,14 @@ onMounted(async () => {
   }, 15_000)
 
   syncTimer = setInterval(async () => {
-    try { await syncTime() } catch { /* ignore */ }
+    try { await syncTime() } catch (e) { /* ignore */ }
   }, 5 * 60_000)
 })
 
 onUnmounted(() => {
   if (deadlineTimer) clearInterval(deadlineTimer)
   if (syncTimer) clearInterval(syncTimer)
+  try { wsDisconnect() } catch (e) { /* ignore */ }
 })
 </script>
 
